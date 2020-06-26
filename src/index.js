@@ -5,6 +5,11 @@ import {ObjectInspector} from 'react-inspector';
 import { ObjectRootLabel } from 'react-inspector'
 import { ObjectLabel } from 'react-inspector'
 
+const omitDeep = require("omit-deep-lodash");
+
+init();
+
+
 const defaultNodeRenderer = ({ depth, name, data, isNonenumerable, expanded }) => {
 
   let label = depth === 0
@@ -14,7 +19,6 @@ const defaultNodeRenderer = ({ depth, name, data, isNonenumerable, expanded }) =
   const copyContents = (ev) => {
     ev.stopPropagation();
     ev.preventDefault();
-    console.log(data);
     copyToClipboard(JSON.stringify(data, null, '\t'));
     return false;
   }
@@ -25,7 +29,6 @@ const defaultNodeRenderer = ({ depth, name, data, isNonenumerable, expanded }) =
 }
 
 
-const domContainer = document.querySelector('#replay-inspector-app');
 
 class ReplayInspector extends React.Component {
   constructor(props) {
@@ -35,40 +38,62 @@ class ReplayInspector extends React.Component {
     }
   }
   componentDidMount() {
-    setInterval(() => {
-      getReplayState(gameState => {
-        this.setState({
-          gameState
-        });
+    setInterval(async () => {
+      let gameState = this.state;
+      try {
+        gameState = await getHook();
+      } catch (err) {
+        console.error(err)
+      }
+      this.setState({
+        gameState
       });
     }, 100);
   }
   render() {
-    
-    
+    console.log(cleanGameState(this.state.gameState));
     return React.createElement(ObjectInspector, {
-      data: this.state.gameState,
+      data: cleanGameState(this.state.gameState),
       expandLevel: 1,
       nodeRenderer: defaultNodeRenderer
     });
   }
 }
 
-ReactDOM.render(React.createElement(ReplayInspector), domContainer);
-
-
-
-function getReplayState(callback) {
-  chrome.devtools.inspectedWindow.eval(
-    'window.__replay_state__',
-    function(result, isException) {
-      if (isException) {
-        throw(isException);
-      }
-      callback(result);
-    }
-  );  
+async function init() {
+  try {
+    await addHook();    
+  } catch (err) {
+    console.error(err)
+  }
+  const domContainer = document.querySelector('#replay-inspector-app');
+  ReactDOM.render(React.createElement(ReplayInspector), domContainer);
 }
+
+
+
+async function addHook() {
+  return await runEval('window.__REPLAY_DEVTOOLS_GLOBAL_HOOK__ = {}');
+}
+
+async function getHook(callback) {
+  return await runEval('window.__REPLAY_DEVTOOLS_GLOBAL_HOOK__');
+}
+
+async function runEval(codeSnippet) {
+  return new Promise((res, rej) => {
+    chrome.devtools.inspectedWindow.eval(
+      codeSnippet,
+      function(result, isException) {
+        if (isException) {
+          rej(isException);
+        }
+        res(result);
+      }
+    );  
+  });
+}
+
 
 
 function copyToClipboard (state) {
@@ -78,4 +103,9 @@ function copyToClipboard (state) {
   dummyTextArea.select()
   document.execCommand('copy')
   document.body.removeChild(dummyTextArea)
+}
+
+function cleanGameState(state) {
+  const propsToRemove = ['prevTime','currentLag','getSprites'];
+  return omitDeep(state, ...propsToRemove);
 }

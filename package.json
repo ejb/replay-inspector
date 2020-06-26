@@ -4,10 +4,10 @@
   "description": "DevTools Extension Example ===",
   "main": "background.js",
   "dependencies": {
+    "omit-deep-lodash": "^1.1.4",
     "react": "^16.13.1",
     "react-dom": "^16.13.1",
-    "react-inspector": "^5.0.1",
-    "rollup": "^2.18.0"
+    "react-inspector": "^5.0.1"
   },
   "devDependencies": {
     "webpack": "^4.43.0",
